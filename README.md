@@ -111,86 +111,89 @@ If you want to learn more about Gcore WAAP and how its APIs work, see the offici
 
 ### Run locally on Windows (Grafana installed on host)
 
-1. **Install prerequisites**
-   - Local Grafana install (for example `C:\Program Files\GrafanaLabs\grafana`).
-   - Node.js (v14 or newer) and Yarn.
+#### Install prerequisites
 
-2. **Install dependencies**
+- Local Grafana install (for example `C:\Program Files\GrafanaLabs\grafana`)
+- Node.js (v14 or newer) and Yarn
 
-   From the project root (`Cdnallplugins`):
+#### Install dependencies
 
-   ```bash
-   yarn install
-   ```
+From the project root (`Cdnallplugins`):
 
-3. **Build the plugin (frontend + backend)**
+```bash
+yarn install
+```
 
-   ```bash
-   yarn build:all
-   ```
+#### Build the plugin (frontend + backend)
 
-   This bundles the frontend into `dist` and builds backend binaries for Linux and Windows.
+```bash
+yarn build:all
+```
 
-4. **Copy the plugin into Grafana**
+This bundles the frontend into `dist` and builds backend binaries for Linux and Windows.
 
-   Copy the contents of the `dist` directory into Grafana’s plugins folder, for example:
+#### Copy the plugin into Grafana
 
-   ```text
-   C:\Program Files\GrafanaLabs\grafana\data\plugins\gcore-stats-datasource-plugin
-   ```
+Copy the contents of the `dist` directory into Grafana’s plugins folder, for example:
 
-5. **Allow the unsigned plugin**
+```text
+C:\Program Files\GrafanaLabs\grafana\data\plugins\gcore-stats-datasource-plugin
+```
 
-   Edit `conf\custom.ini` in your Grafana install and ensure:
+#### Allow the unsigned plugin
 
-   ```ini
-   [plugins]
-   allow_loading_unsigned_plugins = gcore-stats-datasource-plugin
-   ```
+Edit `conf\custom.ini` in your Grafana install and ensure:
 
-6. **Restart Grafana and verify**
+```ini
+[plugins]
+allow_loading_unsigned_plugins = gcore-stats-datasource-plugin
+```
 
-   Restart the Grafana service and open:
+#### Restart Grafana and verify
 
-   ```text
-   http://localhost:3000
-   ```
+Restart the Grafana service and open:
 
-   Go to **Connections → Data sources → Add data source** and search for **Gcore Platform-EN** (or the name from `plugin.json`).
+```text
+http://localhost:3000
+```
+
+Go to **Connections → Data sources → Add data source** and search for **Gcore Platform-EN** (or the name from `plugin.json`).
+
+---
 
 ### Run with Docker (Grafana + plugin)
 
-1. **First-time setup**
+#### First-time setup
 
-   From the project root (`Cdnallplugins`):
+From the project root (`Cdnallplugins`):
 
-   ```bash
-   yarn install
-   yarn build:all
-   ```
+```bash
+yarn install
+yarn build:all
+```
 
-   Make sure Docker and Docker Compose are installed.
+Make sure Docker and Docker Compose are installed.
 
-2. **Start Grafana with the plugin**
+#### Start Grafana with the plugin (Use Docker)
 
-   Recommended (uses the helper script):
+Recommended (uses the helper script):
 
-   ```bash
-   yarn server
-   ```
+```bash
+yarn server
+```
 
-   Or call Docker Compose directly:
+Or call Docker Compose directly:
 
-   ```bash
-   docker compose -f .config/docker-compose-base.yaml up --build
-   ```
+```bash
+docker compose -f .config/docker-compose-base.yaml up --build
+```
 
-3. **Access Grafana**
+#### Access Grafana
 
-   Open:
+Open:
 
-   ```text
-   http://localhost:3000
-   ```
+```text
+http://localhost:3000
+```
 
-   Log in (default `admin` / `admin` unless changed) and confirm the `gcore-stats-datasource-plugin` is available under **Connections → Data sources**.
+Log in (default `admin` / `admin` unless changed) and confirm the `gcore-stats-datasource-plugin` is available under **Connections → Data sources**.
