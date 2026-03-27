@@ -1,0 +1,1 @@
+# gcore-stats-datasource-plugin
