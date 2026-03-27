@@ -74,7 +74,7 @@ export const getTimeField = (data: GCPoint[], isMs = false): MutableField => ({
   name: TIME_SERIES_TIME_FIELD_NAME,
   type: FieldType.time,
   config: {},
-  values: data.map((val) => (isMs ? val[0] : val[0] * TimeInSeconds.MILLISECOND)),
+  values: data.map((val) => (isMs ? val[0] : val[0] * TimeInSeconds.MS_PER_SECOND)),
 });
 
 /** Returns an empty data frame placeholder used when there is no data. */

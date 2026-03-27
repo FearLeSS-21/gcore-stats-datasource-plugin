@@ -16,10 +16,13 @@ export const isJWT = (token: string): boolean => {
 
 export const haveAuthSchema = (target: string): boolean => {
   try {
-    const schema = target.split(" ");
+    if (!target || !target.trim()) {
+      return false;
+    }
+    const schema = target.trim().split(" ");
     return schema[0] in AuthSchema;
   } catch (e) {
-    return true;
+    return false;
   }
 };
 

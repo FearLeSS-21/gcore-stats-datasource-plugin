@@ -31,6 +31,7 @@ describe("Token", () => {
   });
 
   it("should return false if not include valid auth token ", () => {
+    expect(haveAuthSchema("   ")).toBe(false);
     expect(haveAuthSchema(`${validJWTToken}`)).toBe(false);
     expect(haveAuthSchema("asdasddasd")).toBe(false);
     expect(haveAuthSchema(`apikey ${validJWTToken}`)).toBe(false);
