@@ -1,5 +1,5 @@
 import defaults from "lodash/defaults";
-import React, { ChangeEvent, PureComponent } from "react";
+import React, { ChangeEvent, useCallback, useEffect, useState } from "react";
 import { LegacyForms, Select, Spinner } from "@grafana/ui";
 import { QueryEditorProps, SelectableValue } from "@grafana/data";
 import { DataSource } from "../datasource";
@@ -57,46 +57,66 @@ const FASTEDGE_METRIC_OPTS: Array<SelectableValue<string>> = [
 
 type Props = QueryEditorProps<DataSource, GCQuery, GCDataSourceOptions>;
 
-type State = {
-  dnsZones: SelectableValue<string>[];
-  dnsZonesLoading: boolean;
-  fastedgeApps: Array<SelectableValue<number>>;
-  fastedgeAppsLoading: boolean;
-};
+export const GCQueryEditor = ({
+  query,
+  datasource,
+  onChange,
+  onRunQuery,
+}: Props) => {
+  const [dnsZones, setDnsZones] = useState<Array<SelectableValue<string>>>([]);
+  const [dnsZonesLoading, setDnsZonesLoading] = useState(false);
+  const [fastedgeApps, setFastedgeApps] = useState<Array<SelectableValue<number>>>(
+    []
+  );
+  const [fastedgeAppsLoading, setFastedgeAppsLoading] = useState(false);
 
-export class GCQueryEditor extends PureComponent<Props, State> {
-  state: State = {
-    dnsZones: [],
-    dnsZonesLoading: false,
-    fastedgeApps: [],
-    fastedgeAppsLoading: false,
-  };
+  const product = (query?.product ?? "cdn") as GCProduct;
 
-  componentDidMount() {
-    this.persistProductDefault();
-    const product = this.props.query?.product ?? "cdn";
-    if (product === "dns") this.loadDnsZones();
-    if (product === "fastedge") this.loadFastEdgeApps();
-  }
-
-  componentDidUpdate(prevProps: Props) {
-    const prevProduct = prevProps.query?.product ?? "cdn";
-    const product = this.props.query?.product ?? "cdn";
-    if (prevProduct !== product) {
-      this.persistProductDefault();
-      if (product === "dns") this.loadDnsZones();
-      if (product === "fastedge") this.loadFastEdgeApps();
+  const loadDnsZones = useCallback(async () => {
+    setDnsZonesLoading(true);
+    try {
+      const result = await datasource.metricFindQuery({
+        selector: { value: GCVariable.Zone },
+      });
+      const zones: SelectableValue<string>[] = (
+        result as Array<{ text: string }>
+      ).map((z) => ({ value: z.text, label: z.text }));
+      setDnsZones([{ value: "all", label: "All Zones" }, ...zones]);
+    } catch {
+      setDnsZones([{ value: "all", label: "All Zones" }]);
+    } finally {
+      setDnsZonesLoading(false);
     }
-  }
+  }, [datasource]);
 
-  persistProductDefault = () => {
-    const { query, onChange, onRunQuery } = this.props;
-    const product = (query?.product ?? "cdn") as GCProduct;
+  const loadFastEdgeApps = useCallback(async () => {
+    setFastedgeAppsLoading(true);
+    try {
+      const raw = await datasource.getResource("fastedge/apps");
+      const arr = Array.isArray(raw)
+        ? raw
+        : (raw as { apps?: { id: number; name?: string }[] })?.apps ?? [];
+      setFastedgeApps([
+        { label: "All", value: 0 },
+        ...arr.map((app: { id: number; name?: string }) => ({
+          label: app.name ?? `App ${app.id}`,
+          value: app.id,
+        })),
+      ]);
+    } catch {
+      setFastedgeApps([{ label: "All", value: 0 }]);
+    } finally {
+      setFastedgeAppsLoading(false);
+    }
+  }, [datasource]);
+
+  const persistProductDefault = useCallback(() => {
     if (!query?.product) {
       onChange({ ...defaults(query, defaultQuery), product: "cdn" });
       onRunQuery?.();
       return;
     }
+
     if (product === "dns" && !query.dnsGranularity) {
       onChange({ ...query, ...defaultDNSQuery } as GCQuery);
       onRunQuery?.();
@@ -107,200 +127,118 @@ export class GCQueryEditor extends PureComponent<Props, State> {
       onChange({ ...query, ...defaultWAAPQuery } as GCQuery);
       onRunQuery?.();
     }
-  };
+  }, [onChange, onRunQuery, product, query]);
 
-  loadDnsZones = async () => {
-    this.setState({ dnsZonesLoading: true });
-    try {
-      const result = await this.props.datasource.metricFindQuery({
-        selector: { value: GCVariable.Zone },
-      });
-      const zones: SelectableValue<string>[] = (result as Array<{ text: string }>).map(
-        (z) => ({ value: z.text, label: z.text })
-      );
-      this.setState({
-        dnsZones: [{ value: "all", label: "All Zones" }, ...zones],
-        dnsZonesLoading: false,
-      });
-    } catch {
-      this.setState({ dnsZones: [{ value: "all", label: "All Zones" }], dnsZonesLoading: false });
+  useEffect(() => {
+    persistProductDefault();
+    if (product === "dns") {
+      void loadDnsZones();
     }
-  };
-
-  loadFastEdgeApps = async () => {
-    this.setState({ fastedgeAppsLoading: true });
-    try {
-      const raw = await this.props.datasource.getResource("fastedge/apps");
-      const arr = Array.isArray(raw) ? raw : (raw as { apps?: { id: number; name?: string }[] })?.apps ?? [];
-      const appOptions: Array<SelectableValue<number>> = [
-        { label: "All", value: 0 },
-        ...arr.map((app: { id: number; name?: string }) => ({
-          label: app.name ?? `App ${app.id}`,
-          value: app.id,
-        })),
-      ];
-      this.setState({ fastedgeApps: appOptions, fastedgeAppsLoading: false });
-    } catch {
-      this.setState({ fastedgeApps: [{ label: "All", value: 0 }], fastedgeAppsLoading: false });
+    if (product === "fastedge") {
+      void loadFastEdgeApps();
     }
-  };
+  }, [loadDnsZones, loadFastEdgeApps, persistProductDefault, product]);
 
-  onProductChange = (opt: SelectableValue<GCProduct>) => {
-    const { onChange, query, onRunQuery } = this.props;
-    const product = (opt?.value ?? "cdn") as GCProduct;
-    const next: Partial<GCQuery> = { ...query, product };
-    if (product === "cdn") Object.assign(next, defaultQuery);
-    else if (product === "dns") Object.assign(next, defaultDNSQuery);
-    else if (product === "fastedge") Object.assign(next, defaultFastEdgeQuery);
-    else if (product === "waap") Object.assign(next, defaultWAAPQuery);
+  const onProductChange = (opt: SelectableValue<GCProduct>) => {
+    const nextProduct = (opt?.value ?? "cdn") as GCProduct;
+    const next: Partial<GCQuery> = { ...query, product: nextProduct };
+    if (nextProduct === "cdn") Object.assign(next, defaultQuery);
+    else if (nextProduct === "dns") Object.assign(next, defaultDNSQuery);
+    else if (nextProduct === "fastedge") Object.assign(next, defaultFastEdgeQuery);
+    else if (nextProduct === "waap") Object.assign(next, defaultWAAPQuery);
     onChange(next as GCQuery);
     onRunQuery?.();
   };
 
-  // --- CDN handlers
-  onMetricChange = (value: SelectableValue<GCMetric>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onMetricChange = (value: SelectableValue<GCMetric>) => {
     onChange({ ...query, metric: value });
     onRunQuery?.();
   };
-  onGroupingChange = (value: Array<SelectableValue<GCGrouping>>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onGroupingChange = (value: Array<SelectableValue<GCGrouping>>) => {
     onChange({ ...query, grouping: value });
     onRunQuery?.();
   };
-  onGranularityChange = (value: SelectableValue<GCGranularity>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onGranularityChange = (value: SelectableValue<GCGranularity>) => {
     onChange({ ...query, granularity: value });
     onRunQuery?.();
   };
-  onVhostsChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onVhostsChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...query, vhosts: e.target.value });
     onRunQuery?.();
   };
-  onResourcesChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onResourcesChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...query, resources: e.target.value });
     onRunQuery?.();
   };
-  onClientsChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onClientsChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...query, clients: e.target.value });
     onRunQuery?.();
   };
-  onRegionChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onRegionChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...query, regions: e.target.value });
     onRunQuery?.();
   };
-  onCountryChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onCountryChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...query, countries: e.target.value });
     onRunQuery?.();
   };
-  onLegendFormatChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onLegendFormatChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...query, legendFormat: e.target.value });
     onRunQuery?.();
   };
 
-  // --- DNS handlers
-  onZoneChange = (opt: SelectableValue<string>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onZoneChange = (opt: SelectableValue<string>) => {
     onChange({ ...query, zone: opt?.value });
     onRunQuery?.();
   };
-  onDnsGranularityChange = (opt: SelectableValue<string>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onDnsGranularityChange = (opt: SelectableValue<string>) => {
     onChange({ ...query, dnsGranularity: opt });
     onRunQuery?.();
   };
-  onRecordTypeChange = (opt: SelectableValue<string>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onRecordTypeChange = (opt: SelectableValue<string>) => {
     onChange({ ...query, record_type: opt?.value });
     onRunQuery?.();
   };
-  onDnsLegendFormatChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onDnsLegendFormatChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...query, dnsLegendFormat: e.target.value });
     onRunQuery?.();
   };
 
-  // --- FastEdge handlers
-  onAppChange = (opt: SelectableValue<number>) => {
-    const { onChange, query, onRunQuery } = this.props;
-    const name = opt?.value === 0 ? "All" : this.state.fastedgeApps.find((a) => a.value === opt?.value)?.label;
+  const onAppChange = (opt: SelectableValue<number>) => {
+    const name =
+      opt?.value === 0
+        ? "All"
+        : fastedgeApps.find((a) => a.value === opt?.value)?.label;
     onChange({ ...query, appId: opt?.value ?? 0, appName: name });
     onRunQuery?.();
   };
-  onStepChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onStepChange = (e: ChangeEvent<HTMLInputElement>) => {
     const step = parseInt(e.target.value, 10);
     onChange({ ...query, step: !Number.isNaN(step) && step > 0 ? step : 60 });
     onRunQuery?.();
   };
-  onNetworkChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onNetworkChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...query, network: e.target.value });
     onRunQuery?.();
   };
-  onFastedgeMetricChange = (opt: SelectableValue<string>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onFastedgeMetricChange = (opt: SelectableValue<string>) => {
     onChange({ ...query, fastedgeMetric: opt?.value ?? "avg" });
     onRunQuery?.();
   };
 
-  // --- WAAP handlers
-  onWaapMetricChange = (opt: SelectableValue<string>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onWaapMetricChange = (opt: SelectableValue<string>) => {
     onChange({ ...query, waapMetric: opt?.value ?? "total_requests" });
     onRunQuery?.();
   };
-  onWaapGranularityChange = (opt: SelectableValue<string>) => {
-    const { onChange, query, onRunQuery } = this.props;
+  const onWaapGranularityChange = (opt: SelectableValue<string>) => {
     onChange({ ...query, waapGranularity: (opt?.value as "1h" | "1d") ?? "1h" });
     onRunQuery?.();
   };
-  onWaapLegendFormatChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { onChange, query } = this.props;
+  const onWaapLegendFormatChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange({ ...query, waapLegendFormat: e.target.value });
   };
 
-  render() {
-    const query = defaults(this.props.query, defaultQuery) as GCQuery;
-    const product = (query.product ?? "cdn") as GCProduct;
-    const productOption = GC_PRODUCTS.find((p) => p.value === product) ?? GC_PRODUCTS[0];
-
-    return (
-      <div style={{ display: "flex", gap: "24px", alignItems: "flex-start" }}>
-        <div className="gf-form-group" style={{ minWidth: "240px", maxWidth: "240px" }}>
-          <label className="gf-form-group-label">Edge Network</label>
-          <FormField
-            label="Service"
-            labelWidth={6}
-            tooltip="Select Gcore service (CDN, DNS, FastEdge, WAAP)"
-            inputEl={
-              <Select<GCProduct>
-                width={18}
-                options={GC_PRODUCTS}
-                value={productOption}
-                onChange={this.onProductChange}
-              />
-            }
-          />
-        </div>
-
-        <div style={{ flex: 1 }}>
-          {product === "cdn" && this.renderCdnSection(query)}
-          {product === "dns" && this.renderDnsSection(query)}
-          {product === "fastedge" && this.renderFastEdgeSection(query)}
-          {product === "waap" && this.renderWaapSection(query)}
-        </div>
-      </div>
-    );
-  }
-
-  renderCdnSection(query: GCQuery) {
+  const renderCdnSection = (q: GCQuery) => {
     const {
       metric,
       legendFormat,
@@ -311,7 +249,7 @@ export class GCQueryEditor extends PureComponent<Props, State> {
       vhosts,
       resources,
       clients,
-    } = defaults(query, defaultQuery);
+    } = defaults(q, defaultQuery);
 
     return (
       <>
@@ -329,7 +267,7 @@ export class GCQueryEditor extends PureComponent<Props, State> {
                     maxVisibleValues={20}
                     minMenuHeight={45}
                     menuPlacement="bottom"
-                    onChange={this.onMetricChange}
+                    onChange={onMetricChange}
                     value={metric}
                   />
                 }
@@ -345,7 +283,7 @@ export class GCQueryEditor extends PureComponent<Props, State> {
                     maxVisibleValues={4}
                     minMenuHeight={25}
                     menuPlacement="bottom"
-                    onChange={this.onGranularityChange}
+                    onChange={onGranularityChange}
                     value={granularity}
                   />
                 }
@@ -362,7 +300,7 @@ export class GCQueryEditor extends PureComponent<Props, State> {
                     maxVisibleValues={20}
                     minMenuHeight={35}
                     menuPlacement="bottom"
-                    onChange={this.onGroupingChange}
+                    onChange={onGroupingChange}
                     value={grouping}
                   />
                 }
@@ -372,19 +310,19 @@ export class GCQueryEditor extends PureComponent<Props, State> {
           <div className="section" style={{ marginRight: "27px" }}>
             <label className="gf-form-group-label">Filters (comma separated)</label>
             <div className="gf-form">
-              <GCInput width={8} value={vhosts} onChange={this.onVhostsChange} label="Vhosts" tooltip="Filter by vhost" type="text" />
+              <GCInput width={8} value={vhosts} onChange={onVhostsChange} label="Vhosts" tooltip="Filter by vhost" type="text" />
             </div>
             <div className="gf-form">
-              <GCInput width={8} value={resources} onChange={this.onResourcesChange} label="Resources" tooltip="Filter by resource id" type="text" />
+              <GCInput width={8} value={resources} onChange={onResourcesChange} label="Resources" tooltip="Filter by resource id" type="text" />
             </div>
             <div className="gf-form">
-              <GCInput width={8} value={clients} onChange={this.onClientsChange} label="Clients" tooltip="Filter by client id" type="text" />
+              <GCInput width={8} value={clients} onChange={onClientsChange} label="Clients" tooltip="Filter by client id" type="text" />
             </div>
             <div className="gf-form">
-              <GCInput width={8} value={regions} onChange={this.onRegionChange} label="Regions" tooltip="Filter by region" type="text" />
+              <GCInput width={8} value={regions} onChange={onRegionChange} label="Regions" tooltip="Filter by region" type="text" />
             </div>
             <div className="gf-form">
-              <GCInput width={8} value={countries} onChange={this.onCountryChange} label="Countries" tooltip="Filter by country" type="text" />
+              <GCInput width={8} value={countries} onChange={onCountryChange} label="Countries" tooltip="Filter by country" type="text" />
             </div>
           </div>
         </div>
@@ -392,7 +330,7 @@ export class GCQueryEditor extends PureComponent<Props, State> {
           <GCInput
             inputWidth={30}
             value={legendFormat}
-            onChange={this.onLegendFormatChange}
+            onChange={onLegendFormatChange}
             label="Legend"
             placeholder="legend format"
             tooltip="Controls the name of the time series."
@@ -401,14 +339,20 @@ export class GCQueryEditor extends PureComponent<Props, State> {
         </div>
       </>
     );
-  }
+  };
 
-  renderDnsSection(query: GCQuery) {
-    const q = defaults(query, defaultDNSQuery) as GCQuery;
-    const zone = q.zone ?? "all";
-    const selectedZone = zone === "all" ? { value: "all", label: "All Zones" } : this.state.dnsZones.find((z) => z.value === zone) ?? { value: zone, label: zone };
-    const dnsGranularity = q.dnsGranularity ?? { value: GCDNSGranularity.FiveMinutes, label: "5m" };
-    const recordType = q.record_type ?? GCDNSRecordType.All;
+  const renderDnsSection = (q: GCQuery) => {
+    const dnsQuery = defaults(q, defaultDNSQuery) as GCQuery;
+    const zone = dnsQuery.zone ?? "all";
+    const selectedZone =
+      zone === "all"
+        ? { value: "all", label: "All Zones" }
+        : dnsZones.find((z) => z.value === zone) ?? { value: zone, label: zone };
+    const dnsGranularity = dnsQuery.dnsGranularity ?? {
+      value: GCDNSGranularity.FiveMinutes,
+      label: "5m",
+    };
+    const recordType = dnsQuery.record_type ?? GCDNSRecordType.All;
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "420px" }}>
@@ -420,13 +364,13 @@ export class GCQueryEditor extends PureComponent<Props, State> {
           inputEl={
             <Select
               width={20}
-              options={this.state.dnsZones}
-              isLoading={this.state.dnsZonesLoading}
+              options={dnsZones}
+              isLoading={dnsZonesLoading}
               isSearchable
               menuPlacement="bottom"
-              onChange={this.onZoneChange}
+              onChange={onZoneChange}
               value={selectedZone}
-              placeholder={this.state.dnsZonesLoading ? "Loading zones..." : "Select zone"}
+              placeholder={dnsZonesLoading ? "Loading zones..." : "Select zone"}
             />
           }
         />
@@ -438,8 +382,12 @@ export class GCQueryEditor extends PureComponent<Props, State> {
             <Select
               width={20}
               options={DNS_GRANULARITY_OPTS}
-              value={DNS_GRANULARITY_OPTS.find((o) => o.value === (dnsGranularity?.value ?? dnsGranularity)) ?? DNS_GRANULARITY_OPTS[0]}
-              onChange={this.onDnsGranularityChange}
+              value={
+                DNS_GRANULARITY_OPTS.find(
+                  (o) => o.value === (dnsGranularity?.value ?? dnsGranularity)
+                ) ?? DNS_GRANULARITY_OPTS[0]
+              }
+              onChange={onDnsGranularityChange}
             />
           }
         />
@@ -451,15 +399,18 @@ export class GCQueryEditor extends PureComponent<Props, State> {
             <Select
               width={20}
               options={DNS_RECORD_TYPE_OPTS}
-              value={DNS_RECORD_TYPE_OPTS.find((o) => o.value === recordType) ?? DNS_RECORD_TYPE_OPTS[0]}
-              onChange={this.onRecordTypeChange}
+              value={
+                DNS_RECORD_TYPE_OPTS.find((o) => o.value === recordType) ??
+                DNS_RECORD_TYPE_OPTS[0]
+              }
+              onChange={onRecordTypeChange}
             />
           }
         />
         <GCInput
           inputWidth={30}
-          value={q.dnsLegendFormat ?? ""}
-          onChange={this.onDnsLegendFormatChange}
+          value={dnsQuery.dnsLegendFormat ?? ""}
+          onChange={onDnsLegendFormatChange}
           label="Legend"
           placeholder="e.g. zone, record_type"
           tooltip="Controls how DNS time series are named in the legend."
@@ -467,14 +418,15 @@ export class GCQueryEditor extends PureComponent<Props, State> {
         />
       </div>
     );
-  }
+  };
 
-  renderFastEdgeSection(query: GCQuery) {
-    const q = defaults(query, defaultFastEdgeQuery) as GCQuery;
-    const appId = q.appId ?? 0;
-    const step = q.step ?? 60;
-    const selectedApp = this.state.fastedgeApps.find((a) => a.value === appId) ?? this.state.fastedgeApps[0];
-    const metric = q.fastedgeMetric ?? "avg";
+  const renderFastEdgeSection = (q: GCQuery) => {
+    const fastedgeQuery = defaults(q, defaultFastEdgeQuery) as GCQuery;
+    const appId = fastedgeQuery.appId ?? 0;
+    const step = fastedgeQuery.step ?? 60;
+    const selectedApp =
+      fastedgeApps.find((a) => a.value === appId) ?? fastedgeApps[0];
+    const metric = fastedgeQuery.fastedgeMetric ?? "avg";
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "16px", maxWidth: "420px" }}>
@@ -484,13 +436,13 @@ export class GCQueryEditor extends PureComponent<Props, State> {
           labelWidth={12}
           tooltip="FastEdge application to query"
           inputEl={
-            this.state.fastedgeAppsLoading ? (
+            fastedgeAppsLoading ? (
               <Spinner />
             ) : (
               <Select
-                options={this.state.fastedgeApps}
+                options={fastedgeApps}
                 value={selectedApp}
-                onChange={this.onAppChange}
+                onChange={onAppChange}
                 placeholder="Select an App"
                 width={30}
               />
@@ -504,8 +456,11 @@ export class GCQueryEditor extends PureComponent<Props, State> {
           inputEl={
             <Select
               options={FASTEDGE_METRIC_OPTS}
-              value={FASTEDGE_METRIC_OPTS.find((o) => o.value === metric) ?? FASTEDGE_METRIC_OPTS[0]}
-              onChange={this.onFastedgeMetricChange}
+              value={
+                FASTEDGE_METRIC_OPTS.find((o) => o.value === metric) ??
+                FASTEDGE_METRIC_OPTS[0]
+              }
+              onChange={onFastedgeMetricChange}
               width={20}
             />
           }
@@ -519,7 +474,7 @@ export class GCQueryEditor extends PureComponent<Props, State> {
               className="gf-form-input"
               type="number"
               value={String(step)}
-              onChange={this.onStepChange}
+              onChange={onStepChange}
               placeholder="Step in seconds"
             />
           }
@@ -532,20 +487,20 @@ export class GCQueryEditor extends PureComponent<Props, State> {
             <input
               className="gf-form-input"
               type="text"
-              value={q.network ?? ""}
-              onChange={this.onNetworkChange}
+              value={fastedgeQuery.network ?? ""}
+              onChange={onNetworkChange}
               placeholder="Network name"
             />
           }
         />
       </div>
     );
-  }
+  };
 
-  renderWaapSection(query: GCQuery) {
-    const q = defaults(query, defaultWAAPQuery) as GCQuery;
-    const metric = q.waapMetric ?? "total_requests";
-    const granularity = q.waapGranularity ?? "1h";
+  const renderWaapSection = (q: GCQuery) => {
+    const waapQuery = defaults(q, defaultWAAPQuery) as GCQuery;
+    const metric = waapQuery.waapMetric ?? "total_requests";
+    const granularity = waapQuery.waapGranularity ?? "1h";
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "16px", maxWidth: "520px" }}>
@@ -557,8 +512,11 @@ export class GCQueryEditor extends PureComponent<Props, State> {
           inputEl={
             <Select
               options={WAAP_METRIC_OPTS}
-              value={WAAP_METRIC_OPTS.find((o) => o.value === metric) ?? WAAP_METRIC_OPTS[0]}
-              onChange={this.onWaapMetricChange}
+              value={
+                WAAP_METRIC_OPTS.find((o) => o.value === metric) ??
+                WAAP_METRIC_OPTS[0]
+              }
+              onChange={onWaapMetricChange}
               width={30}
             />
           }
@@ -570,8 +528,11 @@ export class GCQueryEditor extends PureComponent<Props, State> {
           inputEl={
             <Select
               options={WAAP_GRANULARITY_OPTS}
-              value={WAAP_GRANULARITY_OPTS.find((o) => o.value === granularity) ?? WAAP_GRANULARITY_OPTS[0]}
-              onChange={this.onWaapGranularityChange}
+              value={
+                WAAP_GRANULARITY_OPTS.find((o) => o.value === granularity) ??
+                WAAP_GRANULARITY_OPTS[0]
+              }
+              onChange={onWaapGranularityChange}
               width={30}
             />
           }
@@ -584,13 +545,46 @@ export class GCQueryEditor extends PureComponent<Props, State> {
             <input
               className="gf-form-input"
               type="text"
-              value={q.waapLegendFormat ?? ""}
-              onChange={this.onWaapLegendFormatChange}
+              value={waapQuery.waapLegendFormat ?? ""}
+              onChange={onWaapLegendFormatChange}
               placeholder="Legend format"
             />
           }
         />
       </div>
     );
-  }
-}
+  };
+
+  const normalizedQuery = defaults(query, defaultQuery) as GCQuery;
+  const productOption =
+    GC_PRODUCTS.find((productValue) => productValue.value === product) ??
+    GC_PRODUCTS[0];
+
+  return (
+    <div style={{ display: "flex", gap: "24px", alignItems: "flex-start" }}>
+      <div className="gf-form-group" style={{ minWidth: "240px", maxWidth: "240px" }}>
+        <label className="gf-form-group-label">Edge Network</label>
+        <FormField
+          label="Service"
+          labelWidth={6}
+          tooltip="Select Gcore service (CDN, DNS, FastEdge, WAAP)"
+          inputEl={
+            <Select<GCProduct>
+              width={18}
+              options={GC_PRODUCTS}
+              value={productOption}
+              onChange={onProductChange}
+            />
+          }
+        />
+      </div>
+
+      <div style={{ flex: 1 }}>
+        {product === "cdn" && renderCdnSection(normalizedQuery)}
+        {product === "dns" && renderDnsSection(normalizedQuery)}
+        {product === "fastedge" && renderFastEdgeSection(normalizedQuery)}
+        {product === "waap" && renderWaapSection(normalizedQuery)}
+      </div>
+    </div>
+  );
+};

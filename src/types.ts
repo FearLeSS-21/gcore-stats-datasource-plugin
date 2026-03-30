@@ -157,7 +157,6 @@ export interface GCCdnResource {
 
 export interface GCDataSourceOptions extends DataSourceJsonData {
   path?: string;
-  apiKey?: string;
   apiUrl?: string;
 }
 

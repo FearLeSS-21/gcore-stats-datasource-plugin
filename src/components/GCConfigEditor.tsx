@@ -1,4 +1,4 @@
-import React, { ChangeEvent, PureComponent } from "react";
+import React, { ChangeEvent, useState } from "react";
 import { Alert, Legend, LegacyForms } from "@grafana/ui";
 import { DataSourcePluginOptionsEditorProps } from "@grafana/data";
 import { GCDataSourceOptions, GCJsonData, GCSecureJsonData } from "../types";
@@ -9,56 +9,37 @@ const { FormField, SecretFormField } = LegacyForms;
 interface Props
   extends DataSourcePluginOptionsEditorProps<GCDataSourceOptions> {}
 
-interface State {
-  apiKey: string;
-  apiUrl: string;
-}
+export const GCConfigEditor = ({ options, onOptionsChange }: Props) => {
+  const secureJsonData = (options.secureJsonData || {}) as GCSecureJsonData;
+  const jsonData = (options.jsonData || {}) as GCJsonData;
+  const [apiKey, setApiKey] = useState<string>(secureJsonData.apiKey || "");
+  const [apiUrl, setApiUrl] = useState<string>(jsonData.apiUrl || "");
 
-export class GCConfigEditor extends PureComponent<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    const secureJsonData = (props.options.secureJsonData ||
-      {}) as GCSecureJsonData;
-    const jsonData = (props.options.jsonData || {}) as GCJsonData;
-
-    this.state = {
-      apiKey: secureJsonData.apiKey || "",
-      apiUrl: jsonData.apiUrl || "",
-    };
-  }
-
-  onApiUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
-    this.setState({
-      apiUrl: event.target.value,
-    });
+  const onApiUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setApiUrl(event.target.value);
   };
 
-  updateApiUrl = () => {
-    const { onOptionsChange, options } = this.props;
-    const apiUrl = getHostnameValue(this.state.apiUrl.trim());
+  const updateApiUrl = () => {
+    const normalizedApiUrl = getHostnameValue(apiUrl.trim());
     onOptionsChange({
       ...options,
-      jsonData: { apiUrl },
+      jsonData: { apiUrl: normalizedApiUrl },
     });
   };
 
-  onApiKeyChange = (event: ChangeEvent<HTMLInputElement>) => {
-    this.setState({
-      apiKey: event.target.value,
-    });
+  const onApiKeyChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setApiKey(event.target.value);
   };
 
-  updateApiKey = () => {
-    const { onOptionsChange, options } = this.props;
-    const apiKey = getAuthorizationValue(this.state.apiKey.trim());
+  const updateApiKey = () => {
+    const normalizedApiKey = getAuthorizationValue(apiKey.trim());
     onOptionsChange({
       ...options,
-      secureJsonData: { apiKey },
+      secureJsonData: { apiKey: normalizedApiKey },
     });
   };
 
-  onResetApiKey = () => {
-    const { onOptionsChange, options } = this.props;
+  const onResetApiKey = () => {
     onOptionsChange({
       ...options,
       secureJsonFields: {
@@ -72,55 +53,51 @@ export class GCConfigEditor extends PureComponent<Props, State> {
     });
   };
 
-  render() {
-    const { options } = this.props;
-    const { apiKey, apiUrl } = this.state;
-    const { secureJsonFields } = options;
-    const isConfigured = secureJsonFields && secureJsonFields.apiKey;
+  const { secureJsonFields } = options;
+  const isConfigured = secureJsonFields && secureJsonFields.apiKey;
 
-    return (
-      <>
-        <Legend>HTTP</Legend>
+  return (
+    <>
+      <Legend>HTTP</Legend>
 
-        <div className="gf-form-group">
-          <FormField
-            label={"URL"}
-            labelWidth={8}
-            inputWidth={20}
-            placeholder={"API base url"}
-            value={apiUrl}
-            onChange={this.onApiUrlChange}
-            onBlur={this.updateApiUrl}
-            required={true}
-          />
-        </div>
+      <div className="gf-form-group">
+        <FormField
+          label={"URL"}
+          labelWidth={8}
+          inputWidth={20}
+          placeholder={"API base url"}
+          value={apiUrl}
+          onChange={onApiUrlChange}
+          onBlur={updateApiUrl}
+          required={true}
+        />
+      </div>
 
-        <div className="gf-form-group">
-          <SecretFormField
-            isConfigured={isConfigured}
-            label="API key"
-            placeholder="Secure field"
-            labelWidth={8}
-            inputWidth={20}
-            value={apiKey}
-            onChange={this.onApiKeyChange}
-            onBlur={this.updateApiKey}
-            onReset={this.onResetApiKey}
-          />
-        </div>
+      <div className="gf-form-group">
+        <SecretFormField
+          isConfigured={isConfigured}
+          label="API key"
+          placeholder="Secure field"
+          labelWidth={8}
+          inputWidth={20}
+          value={apiKey}
+          onChange={onApiKeyChange}
+          onBlur={updateApiKey}
+          onReset={onResetApiKey}
+        />
+      </div>
 
-        <div className="gf-form-group">
-          <Alert severity={"info"} title="How to create a API token?">
-            <a
-              href="https://gcore.com/docs/account-settings/create-use-or-delete-a-permanent-api-token"
-              target="_blank"
-              rel="noreferrer"
-            >
-              https://gcore.com/docs/account-settings/create-use-or-delete-a-permanent-api-token
-            </a>
-          </Alert>
-        </div>
-      </>
-    );
-  }
-}
+      <div className="gf-form-group">
+        <Alert severity={"info"} title="How to create a API token?">
+          <a
+            href="https://gcore.com/docs/account-settings/create-use-or-delete-a-permanent-api-token"
+            target="_blank"
+            rel="noreferrer"
+          >
+            https://gcore.com/docs/account-settings/create-use-or-delete-a-permanent-api-token
+          </a>
+        </Alert>
+      </div>
+    </>
+  );
+};
