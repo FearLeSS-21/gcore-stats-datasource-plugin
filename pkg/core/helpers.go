@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 
-func parseUnifiedQuery(query backend.DataQuery) (*QueryModel, error) {
+func ParseUnifiedQuery(query backend.DataQuery) (*QueryModel, error) {
 	if len(query.JSON) == 0 {
 		return nil, fmt.Errorf("query JSON is empty")
 	}
@@ -21,8 +21,8 @@ func parseUnifiedQuery(query backend.DataQuery) (*QueryModel, error) {
 	return &qm, nil
 }
 
-func buildStatsRequest(query backend.DataQuery) (*StatsRequest, error) {
-	qm, err := parseUnifiedQuery(query)
+func BuildStatsRequest(query backend.DataQuery) (*StatsRequest, error) {
+	qm, err := ParseUnifiedQuery(query)
 	if err != nil {
 		return nil, err
 	}
@@ -48,17 +48,17 @@ func buildStatsRequest(query backend.DataQuery) (*StatsRequest, error) {
 		Granularity: granularity,
 		From:        query.TimeRange.From.UTC().Format(time.RFC3339),
 		To:          query.TimeRange.To.UTC().Format(time.RFC3339),
-		Vhosts:      parseStrings(qm.Vhosts),
-		Resources:   parseInts(qm.Resources),
-		Countries:   parseStrings(qm.Countries),
-		Regions:     parseStrings(qm.Regions),
-		Clients:     parseInts(qm.Clients),
-		GroupBy:     extractGrouping(qm.Grouping),
+		Vhosts:      ParseStrings(qm.Vhosts),
+		Resources:   ParseInts(qm.Resources),
+		Countries:   ParseStrings(qm.Countries),
+		Regions:     ParseStrings(qm.Regions),
+		Clients:     ParseInts(qm.Clients),
+		GroupBy:     ExtractGrouping(qm.Grouping),
 		Flat:        true,
 	}, nil
 }
 
-func extractGrouping(values []SelectableValue) []string {
+func ExtractGrouping(values []SelectableValue) []string {
 	var out []string
 	for _, v := range values {
 		if v.Value != "" {
@@ -68,7 +68,7 @@ func extractGrouping(values []SelectableValue) []string {
 	return out
 }
 
-func parseInts(s string) []int64 {
+func ParseInts(s string) []int64 {
 	var out []int64
 	for _, p := range strings.Split(s, ",") {
 		if v, err := strconv.ParseInt(strings.TrimSpace(p), 10, 64); err == nil {
@@ -78,7 +78,7 @@ func parseInts(s string) []int64 {
 	return out
 }
 
-func parseStrings(s string) []string {
+func ParseStrings(s string) []string {
 	var out []string
 	for _, p := range strings.Split(s, ",") {
 		if v := strings.TrimSpace(p); v != "" {
@@ -86,6 +86,17 @@ func parseStrings(s string) []string {
 		}
 	}
 	return out
+}
+
+// isAllToken returns true when selector represents the "all" choice.
+func IsAllToken(s string) bool {
+	return strings.TrimSpace(strings.ToLower(s)) == "all"
+}
+
+// parseSelection returns a canonical list of selected values from a selector string.
+// It supports empty, CSV, and single values; trimming whitespace and dropping empties.
+func ParseSelection(s string) []string {
+	return ParseStrings(s)
 }
 
 // DnsGranularityToAPI returns the value to send to Gcore DNS API (e.g. "5m", "1h").

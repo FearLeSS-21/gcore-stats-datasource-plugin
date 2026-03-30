@@ -6,19 +6,20 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/FearLeSS-21/cdn-stats-datasource-plugin/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
+	grafanads "github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 )
 
 func main() {
-	if err := datasource.Manage("gcore-stats-datasource-plugin", newDatasourceFactory(), datasource.ManageOpts{}); err != nil {
+	if err := grafanads.Manage("gcore-stats-datasource-plugin", newDatasourceFactory(), grafanads.ManageOpts{}); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to start datasource: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func newDatasourceFactory() datasource.InstanceFactoryFunc {
+func newDatasourceFactory() grafanads.InstanceFactoryFunc {
 	return func(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 		var jsonData map[string]interface{}
 		if err := json.Unmarshal(settings.JSONData, &jsonData); err != nil {
@@ -35,6 +36,6 @@ func newDatasourceFactory() datasource.InstanceFactoryFunc {
 			apiKey = settings.DecryptedSecureJSONData["apiKey"]
 		}
 
-		return NewDataSource(url, apiKey), nil
+		return datasource.NewDataSource(url, apiKey), nil
 	}
 }
