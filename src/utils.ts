@@ -157,7 +157,14 @@ export const createLabelInfo = (
 export const getValueVariable = (
   target: Array<string | number>
 ): MetricFindValue[] => {
-  return target.filter(unique).map((text) => ({ text: `${text}` }));
+  const out: MetricFindValue[] = [];
+  const seen = new Set<string>();
+  for (const item of target) {
+    const text = `${item}`;
+    if (!seen.has(text)) {
+      seen.add(text);
+      out.push({ text });
+    }
+  }
+  return out;
 };
-
-export const unique = <T>(v: T, idx: number, a: T[]) => a.indexOf(v) === idx;

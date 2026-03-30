@@ -27,7 +27,6 @@ work/
 ci/
 e2e-results/
 docs/
-pkg/
 # Editor
 .idea
 

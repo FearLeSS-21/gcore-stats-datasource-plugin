@@ -1,6 +1,6 @@
 import { DataSourceInstanceSettings } from "@grafana/data";
-import { DataSource } from "./datasource";
-import { GCQuery, GCProduct, GCDataSourceOptions } from "./types";
+import { DataSource } from "../datasource";
+import { GCQuery, GCProduct, GCDataSourceOptions } from "../types";
 
 function createMockInstanceSettings(
   overrides?: Partial<DataSourceInstanceSettings<GCDataSourceOptions>>

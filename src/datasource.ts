@@ -135,10 +135,31 @@ export class DataSource extends DataSourceWithBackend<GCQuery, GCDataSourceOptio
     // DNS variables
     if (selector === GCVariable.Zone) {
       try {
-        const raw = await this.getResource("dns/zones");
-        const data = raw as { zones?: { name: string }[]; total_amount?: number };
-        const zones = data?.zones ?? [];
-        return getValueVariable(zones.map((z) => z.name));
+        const limit = 1000;
+        let offset = 0;
+        const all: { name: string }[] = [];
+        let total: number | undefined;
+
+        // Attempt to paginate if the endpoint supports `limit/offset` and `total_amount`.
+        // Falls back gracefully to first page behavior if not supported.
+        for (;;) {
+          const raw = await this.getResource("dns/zones", { limit, offset } as any);
+          const data = raw as { zones?: { name: string }[]; total_amount?: number };
+          const zones = data?.zones ?? [];
+          if (typeof data?.total_amount === "number") {
+            total = data.total_amount;
+          }
+
+          all.push(...zones);
+          if (zones.length === 0) break;
+          if (total != null && all.length >= total) break;
+
+          // If total is unknown, we stop after first page to avoid an infinite loop.
+          if (total == null) break;
+          offset += limit;
+        }
+
+        return getValueVariable(all.map((z) => z.name));
       } catch {
         return [];
       }
@@ -151,10 +172,19 @@ export class DataSource extends DataSourceWithBackend<GCQuery, GCDataSourceOptio
     if (selector === GCVariable.App) {
       try {
         const raw = await this.getResource("fastedge/apps");
-        const arr = Array.isArray(raw) ? raw : (raw as { apps?: unknown[] })?.apps ?? [];
-        return getValueVariable(
-          arr.map((app: { id?: number; name?: string }) => app?.name ?? `App ${app?.id ?? "?"}`)
-        );
+        const arr =
+          (Array.isArray(raw) ? raw : (raw as { apps?: unknown[] })?.apps ?? []) as Array<{
+            id?: number;
+            name?: string;
+          }>;
+
+        // MetricFindValue supports optional `value`. We return `text` for display
+        // (and templating) while keeping `value` as the numeric app id so the
+        // query editor can use it without re-fetching.
+        return arr.map((app) => ({
+          text: app?.name ?? `App ${app?.id ?? "?"}`,
+          value: app?.id,
+        }));
       } catch {
         return [];
       }
@@ -166,7 +196,7 @@ export class DataSource extends DataSourceWithBackend<GCQuery, GCDataSourceOptio
   /**
    * Loads the complete list of CDN resources using the backend proxy.
    * The API is paginated, so we fetch the first page, compute the total
-   * amount and then request all remaining pages in parallel.
+   * amount and then request all remaining pages with capped concurrency.
    */
   private async getAllGCCdnResources(): Promise<GCCdnResource[]> {
     const getGCCdnResources = (limit: number, offset = 0) =>
@@ -199,17 +229,25 @@ export class DataSource extends DataSourceWithBackend<GCQuery, GCDataSourceOptio
     if (cdnResourcesCount <= limit) {
       return results;
     }
-    const restChunkRequests = range(limit, cdnResourcesCount, limit).map((offset) =>
-      getGCCdnResources(limit, offset)
-    );
-    const restChunks = await Promise.all(restChunkRequests);
-    return restChunks.reduce<GCCdnResource[]>(
-      (acc, res) => {
-        const d = (res as { data?: Paginator<GCCdnResource> }).data ?? (res as unknown as Paginator<GCCdnResource>);
-        return acc.concat(d.results ?? []);
-      },
-      results
-    );
+
+    const offsets = range(limit, cdnResourcesCount, limit);
+    const concurrency = 6;
+    const acc: GCCdnResource[] = [...results];
+
+    for (let i = 0; i < offsets.length; i += concurrency) {
+      const batch = offsets.slice(i, i + concurrency);
+      const batchChunks = await Promise.all(
+        batch.map((offset) => getGCCdnResources(limit, offset))
+      );
+      for (const res of batchChunks) {
+        const d =
+          (res as { data?: Paginator<GCCdnResource> }).data ??
+          (res as unknown as Paginator<GCCdnResource>);
+        acc.push(...(d.results ?? []));
+      }
+    }
+
+    return acc;
   }
 
   /**

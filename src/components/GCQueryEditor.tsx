@@ -92,16 +92,19 @@ export const GCQueryEditor = ({
   const loadFastEdgeApps = useCallback(async () => {
     setFastedgeAppsLoading(true);
     try {
-      const raw = await datasource.getResource("fastedge/apps");
-      const arr = Array.isArray(raw)
-        ? raw
-        : (raw as { apps?: { id: number; name?: string }[] })?.apps ?? [];
+      const result = await datasource.metricFindQuery({
+        selector: { value: GCVariable.App },
+      });
+
+      const arr = result as Array<{ text: string; value?: number }>;
       setFastedgeApps([
         { label: "All", value: 0 },
-        ...arr.map((app: { id: number; name?: string }) => ({
-          label: app.name ?? `App ${app.id}`,
-          value: app.id,
-        })),
+        ...arr
+          .filter((app) => typeof app?.value === "number" && app.value >= 0)
+          .map((app) => ({
+            label: app.text,
+            value: app.value as number,
+          })),
       ]);
     } catch {
       setFastedgeApps([{ label: "All", value: 0 }]);

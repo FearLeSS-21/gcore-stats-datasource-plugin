@@ -11,8 +11,19 @@ import { ByteUnitEnum, normalizeBytes, preferredBytes } from "./byte-converter";
 
 type Transform = (value: number) => number;
 const noopTransform = (v: number): number => v;
-const safeMax = (values: number[]): number =>
-  values.length > 0 ? Math.max(...values) : 0;
+const getMaxY = (
+  data: GCResponseStats[],
+  getter: (m: GCResponseStats["metrics"]) => number[]
+): number => {
+  let max = 0;
+  for (const series of data) {
+    const ys = getter(series.metrics);
+    for (const y of ys) {
+      if (y > max) max = y;
+    }
+  }
+  return max;
+};
 
 /**
  * Computes the most appropriate unit for the series in `data` based on
@@ -34,14 +45,12 @@ export const getUnit = (
   const rawUnit = getUnitByMetric(metric);
 
   if (rawUnit === GCUnit.Bandwidth) {
-    const times = data.map((p) => getter(p.metrics)).flat();
-    const maxValue = safeMax(times);
+    const maxValue = getMaxY(data, getter);
     const period = getSecondsByGranularity(granulation);
     const unit = preferredBandwidth(maxValue, period);
     return [unit, (value) => normalizedBandwidth(value, period, unit)];
   } else if (rawUnit === GCUnit.Bytes) {
-    const times = data.map((p) => getter(p.metrics)).flat();
-    const maxValue = safeMax(times);
+    const maxValue = getMaxY(data, getter);
     const unit = preferredBytes(maxValue, ByteUnitEnum.B);
     return [unit, (value) => normalizeBytes(value, ByteUnitEnum.B, unit)];
   } else {
