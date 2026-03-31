@@ -21,12 +21,14 @@ export const GCInput: React.FC<InputProps<string>> = (rawProps) => {
   const { onChange, ...props } = rawProps;
   const [value, setValue] = useState(props.value);
   const debouncedFunc = useRef(
-    debounce((q) => onChange(q), props.debounce || 500)
+    debounce((nextValue: string) => {
+      onChange({ target: { value: nextValue } } as ChangeEvent<HTMLInputElement>);
+    }, props.debounce || 500)
   ).current;
   const onChangeDebounce = (e: ChangeEvent<HTMLInputElement>) => {
-    e.persist();
-    setValue(e.target.value);
-    debouncedFunc(e);
+    const nextValue = e.target.value;
+    setValue(nextValue);
+    debouncedFunc(nextValue);
   };
   return <FormField {...props} value={value} onChange={onChangeDebounce} />;
 };

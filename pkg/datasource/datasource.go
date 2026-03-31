@@ -30,14 +30,7 @@ func NewDataSource(url, apiKey string) *GCDataSource {
 }
 
 func (ds *GCDataSource) setHeaders(req *http.Request) {
-	req.Header.Set("Content-Type", "application/json")
-	if ds.APIKey != "" {
-		if strings.HasPrefix(ds.APIKey, "APIKey ") || strings.HasPrefix(ds.APIKey, "Bearer ") {
-			req.Header.Set("Authorization", ds.APIKey)
-		} else {
-			req.Header.Set("Authorization", "APIKey "+ds.APIKey)
-		}
-	}
+	core.ApplyJSONAuthHeaders(req, ds.APIKey)
 }
 
 func (ds *GCDataSource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {

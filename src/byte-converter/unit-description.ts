@@ -65,7 +65,7 @@ export const unitDescription = {
   },
   [ByteUnitEnum.YB]: {
     description: "YottaByte",
-    power10: 24,
+    power10: 27,
     power2: 80,
   },
 };

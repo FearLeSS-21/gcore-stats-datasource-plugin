@@ -35,12 +35,9 @@ func (c *Client) QueryFastEdge(ctx context.Context, qm *core.QueryModel, tr back
 	req.URL.RawQuery = q.Encode()
 
 	var out core.FastEdgeResponseStats
-	_, err = core.DoJSON(
-		ctx,
+	_, err = core.DoJSONRequest(
 		c.HTTP,
-		http.MethodGet,
-		req.URL.String(),
-		nil,
+		req,
 		&out,
 		c.setHeaders,
 		core.HandleAPIError,

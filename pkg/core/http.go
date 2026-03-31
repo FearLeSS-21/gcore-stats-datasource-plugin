@@ -7,13 +7,28 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 )
 
 type HeaderSetter func(*http.Request)
 
 var ErrResponseTooLarge = errors.New("http response body too large")
 
-const DefaultMaxResponseBodyBytes int64 = 10 << 20 // 10 MiB
+var DefaultMaxResponseBodyBytes int64 = 10 << 20 // 10 MiB
+
+// ApplyJSONAuthHeaders applies the standard headers used by this plugin for JSON API calls.
+// If apiKey is prefixed with "APIKey " or "Bearer ", it will be used as-is; otherwise it is treated as a raw key.
+func ApplyJSONAuthHeaders(req *http.Request, apiKey string) {
+	req.Header.Set("Content-Type", "application/json")
+	if apiKey == "" {
+		return
+	}
+	if strings.HasPrefix(apiKey, "APIKey ") || strings.HasPrefix(apiKey, "Bearer ") {
+		req.Header.Set("Authorization", apiKey)
+		return
+	}
+	req.Header.Set("Authorization", "APIKey "+apiKey)
+}
 
 // DoRequest executes the request, reads the full body, and always closes the response body.
 func DoRequest(client *http.Client, req *http.Request, setHeaders HeaderSetter) (int, []byte, error) {
@@ -64,24 +79,16 @@ func statusAccepted(status int, accepted []int) bool {
 	return false
 }
 
-// DoJSON executes a JSON request and unmarshals into out when status is accepted.
+// DoJSONRequest executes an already-built request and unmarshals into out when status is accepted.
 // If out is nil, it only validates status and returns raw body errors consistently.
-func DoJSON(
-	ctx context.Context,
+func DoJSONRequest(
 	client *http.Client,
-	method string,
-	url string,
-	body any,
+	req *http.Request,
 	out any,
 	setHeaders HeaderSetter,
 	handleStatusError func(status int, raw []byte) error,
 	accepted ...int,
 ) ([]byte, error) {
-	req, err := NewJSONRequest(ctx, method, url, body)
-	if err != nil {
-		return nil, err
-	}
-
 	status, raw, err := DoRequest(client, req, setHeaders)
 	if err != nil {
 		return nil, err
@@ -107,5 +114,26 @@ func DoJSON(
 	}
 
 	return raw, nil
+}
+
+// DoJSON executes a JSON request and unmarshals into out when status is accepted.
+// If out is nil, it only validates status and returns raw body errors consistently.
+func DoJSON(
+	ctx context.Context,
+	client *http.Client,
+	method string,
+	url string,
+	body any,
+	out any,
+	setHeaders HeaderSetter,
+	handleStatusError func(status int, raw []byte) error,
+	accepted ...int,
+) ([]byte, error) {
+	req, err := NewJSONRequest(ctx, method, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	return DoJSONRequest(client, req, out, setHeaders, handleStatusError, accepted...)
 }
 

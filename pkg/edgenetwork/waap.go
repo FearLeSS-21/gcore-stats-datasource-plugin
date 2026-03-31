@@ -66,12 +66,9 @@ func (c *Client) QueryWAAP(ctx context.Context, qm *core.QueryModel, tr backend.
 	q.Add("metrics", metric)
 	req.URL.RawQuery = q.Encode()
 
-	raw, err := core.DoJSON(
-		ctx,
+	raw, err := core.DoJSONRequest(
 		c.HTTP,
-		http.MethodGet,
-		req.URL.String(),
-		nil,
+		req,
 		nil,
 		c.setHeaders,
 		core.HandleAPIError,
@@ -112,7 +109,7 @@ func (c *Client) waapTransformToFrames(stats *core.WaapStatsResponse, qm *core.Q
 		for _, point := range points {
 			t, err := time.Parse(time.RFC3339, point.DateTime)
 			if err != nil {
-				t, _ = time.Parse("2006-01-02T15:04:05Z07:00", point.DateTime)
+				continue
 			}
 			val := point.Value
 			if metricName == "total_bytes" {

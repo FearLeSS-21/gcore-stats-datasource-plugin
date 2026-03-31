@@ -23,7 +23,8 @@ export const preferredBytes = (
     return orderedByteUnits[0];
   }
   const num = Math.max(Math.floor(Math.log(bytes) / Math.log(1000)), 0);
-  return orderedByteUnits[num];
+  const idx = Math.min(num, orderedByteUnits.length - 1);
+  return orderedByteUnits[idx];
 };
 
 export const byteConverter = {
