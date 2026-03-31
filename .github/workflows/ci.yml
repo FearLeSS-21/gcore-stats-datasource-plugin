@@ -49,7 +49,7 @@ jobs:
       - name: Check for backend
         id: check-for-backend
         run: |
-          if [ -f "Magefile.go" ]
+          if [ -f "pkg/go.mod" ]
           then
             echo "has-backend=true" >> $GITHUB_OUTPUT
           else
@@ -58,20 +58,18 @@ jobs:
 
       - name: Setup Go environment
         if: steps.check-for-backend.outputs.has-backend == 'true'
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
-          go-version: "1.15"
+          go-version-file: pkg/go.mod
+          cache: true
+          cache-dependency-path: pkg/go.sum
 
       - name: Test backend
         if: steps.check-for-backend.outputs.has-backend == 'true'
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: coverage
+        working-directory: pkg
+        run: go test ./... -coverprofile=coverage.out
 
       - name: Build backend
         if: steps.check-for-backend.outputs.has-backend == 'true'
-        uses: magefile/mage-action@v1
-        with:
-          version: latest
-          args: buildAll
+        working-directory: pkg
+        run: go build ./...

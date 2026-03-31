@@ -2,13 +2,25 @@ package datasource
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
+
+func sendJSONError(sender backend.CallResourceResponseSender, status int, msg string) {
+	body, err := json.Marshal(map[string]string{"error": msg})
+	if err != nil {
+		body = []byte(`{"error":"internal error"}`)
+	}
+	sender.Send(&backend.CallResourceResponse{
+		Status:  status,
+		Body:    body,
+		Headers: map[string][]string{"Content-Type": {"application/json"}},
+	})
+}
 
 func (ds *GCDataSource) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
 	path := strings.TrimPrefix(strings.TrimSpace(req.Path), "/")
@@ -17,7 +29,7 @@ func (ds *GCDataSource) CallResource(ctx context.Context, req *backend.CallResou
 		path = strings.TrimPrefix(path, "/")
 	}
 	if path == "" {
-		sender.Send(&backend.CallResourceResponse{Status: 400, Body: []byte(`{"error":"missing path"}`)})
+		sendJSONError(sender, 400, "missing path")
 		return nil
 	}
 	rootURL := ds.rootURL()
@@ -32,7 +44,7 @@ func (ds *GCDataSource) CallResource(ctx context.Context, req *backend.CallResou
 	case "fastedge/apps":
 		upstreamPath = "fastedge/v1/apps"
 	default:
-		sender.Send(&backend.CallResourceResponse{Status: 404, Body: []byte(`{"error":"unknown path"}`)})
+		sendJSONError(sender, 404, "unknown path")
 		return nil
 	}
 	url := rootURL + "/" + upstreamPath
@@ -43,25 +55,29 @@ func (ds *GCDataSource) CallResource(ctx context.Context, req *backend.CallResou
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, url, nil)
 	if err != nil {
-		sender.Send(&backend.CallResourceResponse{Status: 500, Body: []byte(fmt.Sprintf(`{"error":"%s"}`, err.Error()))})
+		backend.Logger.Error("failed to create resource request", "error", err, "url", url)
+		sendJSONError(sender, 500, "failed to create request")
 		return nil
 	}
 	ds.setHeaders(httpReq)
 	resp, err := ds.Client.Do(httpReq)
 	if err != nil {
-		sender.Send(&backend.CallResourceResponse{Status: 502, Body: []byte(fmt.Sprintf(`{"error":"request failed: %s"}`, err.Error()))})
+		backend.Logger.Error("resource request failed", "error", err, "url", url)
+		sendJSONError(sender, 502, "request failed")
 		return nil
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		sender.Send(&backend.CallResourceResponse{Status: 502, Body: []byte(fmt.Sprintf(`{"error":"read body: %s"}`, err.Error()))})
+		backend.Logger.Error("failed to read resource response body", "error", err, "url", url)
+		sendJSONError(sender, 502, "failed to read response")
 		return nil
 	}
 	status := resp.StatusCode
 	if status >= 500 {
 		status = 502
-		body = []byte(`{"error":"Gcore API server error. Please try again later."}`)
+		sendJSONError(sender, status, "Gcore API server error. Please try again later.")
+		return nil
 	}
 	sender.Send(&backend.CallResourceResponse{
 		Status:  status,
