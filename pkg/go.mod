@@ -1,4 +1,4 @@
-module github.com/FearLeSS-21/cdn-stats-datasource-plugin
+module github.com/G-Core/gcore-stats-datasource-plugin/pkg
 
 go 1.25.0
 

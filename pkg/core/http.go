@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 )
 
 type HeaderSetter func(*http.Request)
+
+var ErrResponseTooLarge = errors.New("http response body too large")
+
+const DefaultMaxResponseBodyBytes int64 = 10 << 20 // 10 MiB
 
 // DoRequest executes the request, reads the full body, and always closes the response body.
 func DoRequest(client *http.Client, req *http.Request, setHeaders HeaderSetter) (int, []byte, error) {
@@ -22,9 +27,13 @@ func DoRequest(client *http.Client, req *http.Request, setHeaders HeaderSetter) 
 	}
 	defer resp.Body.Close()
 
-	raw, err := io.ReadAll(resp.Body)
+	limited := io.LimitReader(resp.Body, DefaultMaxResponseBodyBytes+1)
+	raw, err := io.ReadAll(limited)
 	if err != nil {
 		return resp.StatusCode, nil, err
+	}
+	if int64(len(raw)) > DefaultMaxResponseBodyBytes {
+		return resp.StatusCode, nil, ErrResponseTooLarge
 	}
 
 	return resp.StatusCode, raw, nil

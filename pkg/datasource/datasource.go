@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FearLeSS-21/cdn-stats-datasource-plugin/core"
+	"github.com/G-Core/gcore-stats-datasource-plugin/pkg/core"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 

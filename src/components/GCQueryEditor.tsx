@@ -113,7 +113,7 @@ export const GCQueryEditor = ({
     }
   }, [datasource]);
 
-  const persistProductDefault = useCallback(() => {
+  useEffect(() => {
     if (!query?.product) {
       onChange({ ...defaults(query, defaultQuery), product: "cdn" });
       onRunQuery?.();
@@ -123,24 +123,28 @@ export const GCQueryEditor = ({
     if (product === "dns" && !query.dnsGranularity) {
       onChange({ ...query, ...defaultDNSQuery } as GCQuery);
       onRunQuery?.();
-    } else if (product === "fastedge" && query.fastedgeMetric === undefined) {
+      return;
+    }
+
+    if (product === "fastedge" && query.fastedgeMetric === undefined) {
       onChange({ ...query, ...defaultFastEdgeQuery } as GCQuery);
       onRunQuery?.();
-    } else if (product === "waap" && !query.waapMetric) {
+      return;
+    }
+
+    if (product === "waap" && !query.waapMetric) {
       onChange({ ...query, ...defaultWAAPQuery } as GCQuery);
       onRunQuery?.();
+      return;
     }
-  }, [onChange, onRunQuery, product, query]);
 
-  useEffect(() => {
-    persistProductDefault();
     if (product === "dns") {
       void loadDnsZones();
     }
     if (product === "fastedge") {
       void loadFastEdgeApps();
     }
-  }, [loadDnsZones, loadFastEdgeApps, persistProductDefault, product]);
+  }, [loadDnsZones, loadFastEdgeApps, onChange, onRunQuery, product, query]);
 
   const onProductChange = (opt: SelectableValue<GCProduct>) => {
     const nextProduct = (opt?.value ?? "cdn") as GCProduct;

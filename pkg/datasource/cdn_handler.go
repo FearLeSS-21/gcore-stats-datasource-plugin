@@ -3,8 +3,8 @@ package datasource
 import (
 	"context"
 
-	"github.com/FearLeSS-21/cdn-stats-datasource-plugin/core"
-	"github.com/FearLeSS-21/cdn-stats-datasource-plugin/edgenetwork"
+	"github.com/G-Core/gcore-stats-datasource-plugin/pkg/core"
+	"github.com/G-Core/gcore-stats-datasource-plugin/pkg/edgenetwork"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 

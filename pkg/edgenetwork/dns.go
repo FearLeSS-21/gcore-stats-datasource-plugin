@@ -3,6 +3,7 @@ package edgenetwork
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FearLeSS-21/cdn-stats-datasource-plugin/core"
+	"github.com/G-Core/gcore-stats-datasource-plugin/pkg/core"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 )
@@ -26,9 +27,14 @@ func (c *Client) QueryDNS(ctx context.Context, qm *core.QueryModel, tr backend.T
 	}
 
 	aggregated := make(map[string]float64)
+	var errs []error
 	for _, zoneName := range zones {
 		stats, err := c.dnsFetchZoneStats(ctx, zoneName, qm, tr)
-		if err != nil || stats == nil {
+		if err != nil {
+			errs = append(errs, fmt.Errorf("dns zone %q: %w", zoneName, err))
+			continue
+		}
+		if stats == nil {
 			continue
 		}
 		for ts, val := range stats.Requests {
@@ -36,6 +42,9 @@ func (c *Client) QueryDNS(ctx context.Context, qm *core.QueryModel, tr backend.T
 		}
 	}
 
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
 	return c.dnsTransformToFrames(&core.DNSStatsResponse{Requests: aggregated}, qm), nil
 }
 

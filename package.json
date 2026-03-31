@@ -12,8 +12,8 @@
     "test": "jest --watch --onlyChanged",
     "test:ci": "jest --passWithNoTests --maxWorkers 4",
     "typecheck": "tsc --noEmit",
-    "build:backend:linux": "set GOOS=linux&& set GOARCH=amd64&& go build -C pkg -o ../dist/gcore-stats-datasource-plugin_linux_amd64 .",
-    "build:backend:windows": "set GOOS=windows&& set GOARCH=amd64&& go build -C pkg -o ../dist/gcore-stats-datasource-plugin_windows_amd64.exe .",
+    "build:backend:linux": "cross-env GOOS=linux GOARCH=amd64 go build -C pkg -o ../dist/gcore-stats-datasource-plugin_linux_amd64 .",
+    "build:backend:windows": "cross-env GOOS=windows GOARCH=amd64 go build -C pkg -o ../dist/gcore-stats-datasource-plugin_windows_amd64.exe .",
     "build:backend": "yarn build:backend:linux && yarn build:backend:windows",
     "build:all": "yarn build && yarn build:backend"
   },
@@ -25,6 +25,7 @@
   "author": "Ilya Vishneuski",
   "license": "Apache-2.0",
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "@grafana/eslint-config": "^8.0.0",
     "@grafana/tsconfig": "^2.0.0",
     "@stylistic/eslint-plugin-ts": "^2.9.0",

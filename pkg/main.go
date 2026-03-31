@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/FearLeSS-21/cdn-stats-datasource-plugin/datasource"
+	"github.com/G-Core/gcore-stats-datasource-plugin/pkg/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	grafanads "github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
