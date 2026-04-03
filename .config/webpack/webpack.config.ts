@@ -244,7 +244,10 @@ const config = async (env: Env): Promise<Configuration> => {
       new SubresourceIntegrityPlugin({
         hashFuncNames: ["sha256"],
       }),
-      ...(env.development ? [
+      // LiveReload listens on port 35729; browsers load /livereload.js from there. If webpack watch is not
+      // running (or Docker cannot reach the host port), you get ERR_CONNECTION_REFUSED — set
+      // GRAFANA_PLUGIN_NO_LIVERELOAD=1 or use `yarn dev:no-livereload`.
+      ...(env.development && process.env.GRAFANA_PLUGIN_NO_LIVERELOAD !== '1' ? [
         new LiveReloadPlugin(),
         new ForkTsCheckerWebpackPlugin({
           async: Boolean(env.development),

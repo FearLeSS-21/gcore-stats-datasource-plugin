@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 
+	"github.com/G-Core/gcore-stats-datasource-plugin/pkg/core"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 
@@ -23,20 +23,16 @@ func sendJSONError(sender backend.CallResourceResponseSender, status int, msg st
 }
 
 func (ds *GCDataSource) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
-	path := strings.TrimPrefix(strings.TrimSpace(req.Path), "/")
-	if path == "" {
-		path = strings.TrimSpace(req.URL)
-		path = strings.TrimPrefix(path, "/")
-	}
-	if path == "" {
+	subpath := resourceSubpath(req.Path, req.URL)
+	if subpath == "" {
 		sendJSONError(sender, 400, "missing path")
 		return nil
 	}
 	base := ds.BaseAPIURL()
 	var upstreamPath string
-	switch path {
+	switch subpath {
 	case "iam/users/me", "users/me":
-		upstreamPath = path
+		upstreamPath = subpath
 	case "cdn/resources":
 		upstreamPath = "cdn/resources"
 	case "dns/zones":
@@ -47,12 +43,8 @@ func (ds *GCDataSource) CallResource(ctx context.Context, req *backend.CallResou
 		sendJSONError(sender, 404, "unknown path")
 		return nil
 	}
-	url := base + "/" + upstreamPath
-	if req.URL != "" {
-		if idx := strings.Index(req.URL, "?"); idx >= 0 {
-			url = base + "/" + upstreamPath + req.URL[idx:]
-		}
-	}
+	query := upstreamQueryFromResourceRequest(req.Path, req.URL)
+	url := base + "/" + upstreamPath + query
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, url, nil)
 	if err != nil {
 		backend.Logger.Error("failed to create resource request", "error", err, "url", url)
@@ -67,10 +59,15 @@ func (ds *GCDataSource) CallResource(ctx context.Context, req *backend.CallResou
 		return nil
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	limited := io.LimitReader(resp.Body, core.DefaultMaxResponseBodyBytes+1)
+	body, err := io.ReadAll(limited)
 	if err != nil {
 		backend.Logger.Error("failed to read resource response body", "error", err, "url", url)
 		sendJSONError(sender, 502, "failed to read response")
+		return nil
+	}
+	if int64(len(body)) > core.DefaultMaxResponseBodyBytes {
+		sendJSONError(sender, 502, "Gcore API response too large")
 		return nil
 	}
 	status := resp.StatusCode

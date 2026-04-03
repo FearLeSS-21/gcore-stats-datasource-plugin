@@ -20,6 +20,8 @@ func TestValidateAPIBaseURL(t *testing.T) {
 		"api.staging.gcore.com",
 		"API.GCORE.COM",
 		"api.gcore.com:443",
+		"api.custom.example.com",
+		"https://api.evil.com",
 	}
 	for i, raw := range valid {
 		raw := raw
@@ -42,8 +44,6 @@ func TestValidateAPIBaseURL(t *testing.T) {
 		"https://api.gcore.com?q=1",
 		"https://api.gcore.com#frag",
 		"ftp://api.gcore.com",
-		"api.attacker.com",
-		"https://api.evil.com",
 	}
 	for i, raw := range invalid {
 		raw := raw

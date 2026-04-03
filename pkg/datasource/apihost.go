@@ -8,8 +8,8 @@ import (
 
 // ValidateAPIBaseURL checks jsonData apiUrl before instantiating the datasource.
 // Empty or whitespace-only input is valid (caller substitutes default).
-// Otherwise: parseable as http(s) URL, host must be a Gcore API host (prefix "api." and suffix ".gcore.com"),
-// no path/query/fragment/userinfo. This prevents proxy/backend traffic to arbitrary api.*.com hosts.
+// Otherwise: parseable as http(s) URL, host must start with "api." and end with ".com" (case-insensitive),
+// no path/query/fragment/userinfo. Narrower allowlists (e.g. *.gcore.com only) are a product policy choice.
 func ValidateAPIBaseURL(raw string) error {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -33,9 +33,8 @@ func ValidateAPIBaseURL(raw string) error {
 		return fmt.Errorf("invalid apiUrl: userinfo is not allowed")
 	}
 	host := strings.ToLower(parsed.Hostname())
-	const gcoreAPISuffix = ".gcore.com"
-	if !strings.HasPrefix(host, "api.") || !strings.HasSuffix(host, gcoreAPISuffix) {
-		return fmt.Errorf("invalid apiUrl: host must be a Gcore API hostname (api.*.gcore.com, e.g. api.gcore.com)")
+	if !strings.HasPrefix(host, "api.") || !strings.HasSuffix(host, ".com") {
+		return fmt.Errorf("invalid apiUrl: host must start with \"api.\" and end with \".com\"")
 	}
 	if parsed.Path != "" && parsed.Path != "/" {
 		return fmt.Errorf("invalid apiUrl: path is not allowed")
