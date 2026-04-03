@@ -16,8 +16,8 @@ type IAMUser struct {
 }
 
 func (ds *GCDataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
-	rootURL := ds.rootURL()
-	reqHTTP, err := http.NewRequestWithContext(ctx, http.MethodGet, rootURL+"/iam/users/me", nil)
+	base := ds.BaseAPIURL()
+	reqHTTP, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/iam/users/me", nil)
 	if err != nil {
 		return &backend.CheckHealthResult{Status: backend.HealthStatusError, Message: err.Error()}, nil
 	}

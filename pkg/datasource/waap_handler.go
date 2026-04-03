@@ -10,7 +10,7 @@ import (
 
 func (ds *GCDataSource) queryWAAP(ctx context.Context, query backend.DataQuery, qm *core.QueryModel) backend.DataResponse {
 	client := &edgenetwork.Client{
-		RootURL: ds.rootURL(),
+		RootURL: ds.BaseAPIURL(),
 		APIKey:  ds.APIKey,
 		HTTP:    ds.Client,
 	}

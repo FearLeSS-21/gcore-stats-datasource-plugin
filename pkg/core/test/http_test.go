@@ -1,4 +1,4 @@
-package core
+package core_test
 
 import (
 	"bytes"
@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/G-Core/gcore-stats-datasource-plugin/pkg/core"
 )
 
 func TestApplyJSONAuthHeaders_APIKeyRaw(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "http://example", nil)
-	ApplyJSONAuthHeaders(req, "abc")
+	core.ApplyJSONAuthHeaders(req, "abc")
 	if got := req.Header.Get("Content-Type"); got != "application/json" {
 		t.Fatalf("expected Content-Type application/json, got %q", got)
 	}
@@ -23,26 +25,25 @@ func TestApplyJSONAuthHeaders_APIKeyRaw(t *testing.T) {
 
 func TestApplyJSONAuthHeaders_PassthroughBearer(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "http://example", nil)
-	ApplyJSONAuthHeaders(req, "Bearer token")
+	core.ApplyJSONAuthHeaders(req, "Bearer token")
 	if got := req.Header.Get("Authorization"); got != "Bearer token" {
 		t.Fatalf("expected Authorization %q, got %q", "Bearer token", got)
 	}
 }
 
 func TestDoRequest_ResponseTooLarge(t *testing.T) {
-	// deterministic small limit
-	old := DefaultMaxResponseBodyBytes
-	DefaultMaxResponseBodyBytes = 64
-	t.Cleanup(func() { DefaultMaxResponseBodyBytes = old })
+	old := core.DefaultMaxResponseBodyBytes
+	core.DefaultMaxResponseBodyBytes = 64
+	t.Cleanup(func() { core.DefaultMaxResponseBodyBytes = old })
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write(bytes.Repeat([]byte("a"), int(DefaultMaxResponseBodyBytes)+1))
+		_, _ = w.Write(bytes.Repeat([]byte("a"), int(core.DefaultMaxResponseBodyBytes)+1))
 	}))
 	t.Cleanup(srv.Close)
 
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-	_, _, err := DoRequest(srv.Client(), req, nil)
-	if !errors.Is(err, ErrResponseTooLarge) {
+	_, _, err := core.DoRequest(srv.Client(), req, nil)
+	if !errors.Is(err, core.ErrResponseTooLarge) {
 		t.Fatalf("expected ErrResponseTooLarge, got %v", err)
 	}
 }
@@ -58,7 +59,7 @@ func TestDoJSONRequest_UnmarshalOnAccepted(t *testing.T) {
 	var out struct {
 		X int `json:"x"`
 	}
-	raw, err := DoJSONRequest(srv.Client(), req, &out, nil, HandleAPIError, http.StatusOK)
+	raw, err := core.DoJSONRequest(srv.Client(), req, &out, nil, core.HandleAPIError, http.StatusOK)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -79,7 +80,7 @@ func TestDoJSON_BuildsAndExecutesRequest(t *testing.T) {
 	var out struct {
 		OK bool `json:"ok"`
 	}
-	_, err := DoJSON(context.Background(), srv.Client(), http.MethodGet, srv.URL, nil, &out, nil, HandleAPIError, http.StatusOK)
+	_, err := core.DoJSON(context.Background(), srv.Client(), http.MethodGet, srv.URL, nil, &out, nil, core.HandleAPIError, http.StatusOK)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -87,4 +88,3 @@ func TestDoJSON_BuildsAndExecutesRequest(t *testing.T) {
 		t.Fatalf("expected ok=true")
 	}
 }
-

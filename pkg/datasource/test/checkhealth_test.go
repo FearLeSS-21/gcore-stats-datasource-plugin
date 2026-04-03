@@ -1,4 +1,4 @@
-package datasource
+package datasource_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/G-Core/gcore-stats-datasource-plugin/pkg/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 
@@ -16,11 +17,11 @@ func TestCheckHealth_OK(t *testing.T) {
 		if r.URL.Path != "/iam/users/me" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
-		_ = json.NewEncoder(w).Encode(IAMUser{Name: "Alice"})
+		_ = json.NewEncoder(w).Encode(datasource.IAMUser{Name: "Alice"})
 	}))
 	t.Cleanup(srv.Close)
 
-	ds := &GCDataSource{
+	ds := &datasource.GCDataSource{
 		URL:    srv.URL,
 		APIKey: "abc",
 		Client: srv.Client(),
@@ -42,7 +43,7 @@ func TestCheckHealth_ErrorOnNon200(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	ds := &GCDataSource{
+	ds := &datasource.GCDataSource{
 		URL:    srv.URL,
 		APIKey: "bad",
 		Client: srv.Client(),
@@ -69,7 +70,7 @@ func TestCheckHealth_HTTPTimeout(t *testing.T) {
 	client := srv.Client()
 	client.Timeout = 10 * time.Millisecond
 
-	ds := &GCDataSource{
+	ds := &datasource.GCDataSource{
 		URL:    srv.URL,
 		APIKey: "abc",
 		Client: client,
@@ -86,4 +87,3 @@ func TestCheckHealth_HTTPTimeout(t *testing.T) {
 		t.Fatalf("expected non-empty message")
 	}
 }
-

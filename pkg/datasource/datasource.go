@@ -41,7 +41,8 @@ func (ds *GCDataSource) QueryData(ctx context.Context, req *backend.QueryDataReq
 	return resp, nil
 }
 
-func (ds *GCDataSource) rootURL() string {
+// BaseAPIURL returns the API origin with trailing product path segments (/cdn, /dns, /fastedge, /waap) removed.
+func (ds *GCDataSource) BaseAPIURL() string {
 	u := strings.TrimSuffix(ds.URL, "/")
 	for _, suffix := range []string{"/cdn", "/dns", "/fastedge", "/waap"} {
 		if strings.HasSuffix(u, suffix) {

@@ -15,7 +15,7 @@ func (ds *GCDataSource) queryCDN(ctx context.Context, query backend.DataQuery) b
 	}
 
 	client := &edgenetwork.Client{
-		RootURL: ds.rootURL(),
+		RootURL: ds.BaseAPIURL(),
 		APIKey:  ds.APIKey,
 		HTTP:    ds.Client,
 	}

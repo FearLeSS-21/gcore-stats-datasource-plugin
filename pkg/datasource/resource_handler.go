@@ -32,7 +32,7 @@ func (ds *GCDataSource) CallResource(ctx context.Context, req *backend.CallResou
 		sendJSONError(sender, 400, "missing path")
 		return nil
 	}
-	rootURL := ds.rootURL()
+	base := ds.BaseAPIURL()
 	var upstreamPath string
 	switch path {
 	case "iam/users/me", "users/me":
@@ -47,10 +47,10 @@ func (ds *GCDataSource) CallResource(ctx context.Context, req *backend.CallResou
 		sendJSONError(sender, 404, "unknown path")
 		return nil
 	}
-	url := rootURL + "/" + upstreamPath
+	url := base + "/" + upstreamPath
 	if req.URL != "" {
 		if idx := strings.Index(req.URL, "?"); idx >= 0 {
-			url = rootURL + "/" + upstreamPath + req.URL[idx:]
+			url = base + "/" + upstreamPath + req.URL[idx:]
 		}
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, req.Method, url, nil)
