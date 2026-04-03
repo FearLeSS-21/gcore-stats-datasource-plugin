@@ -1,8 +1,11 @@
 import {
   AuthSchema,
   getAuthorizationValue,
+  getHostnameValue,
   haveAuthSchema,
   isJWT,
+  isValidApiHostname,
+  normalizeApiUrlInput,
 } from "token";
 
 const validJWTToken =
@@ -51,5 +54,27 @@ describe("Token", () => {
     expect(getAuthorizationValue(`${AuthSchema.APIKey} ${validJWTToken}`)).toBe(
       `${AuthSchema.APIKey} ${validJWTToken}`
     );
+  });
+
+  it("should accept valid API hostnames only", () => {
+    expect(isValidApiHostname("")).toBe(true);
+    expect(isValidApiHostname("api.gcore.com")).toBe(true);
+    expect(isValidApiHostname("API.GCORE.COM")).toBe(true);
+    expect(isValidApiHostname("api.staging.gcore.com")).toBe(true);
+    expect(isValidApiHostname("api.gcore.com:443")).toBe(true);
+    expect(normalizeApiUrlInput("https://api.gcore.com/")).toBe("api.gcore.com");
+    expect(getHostnameValue("https://api.gcore.com/")).toBe("api.gcore.com");
+    expect(isValidApiHostname(getHostnameValue("https://api.gcore.com/"))).toBe(
+      true
+    );
+  });
+
+  it("should reject invalid API hostnames", () => {
+    expect(isValidApiHostname("cdn.gcore.com")).toBe(false);
+    expect(isValidApiHostname("api.gcore.com/foo")).toBe(false);
+    expect(isValidApiHostname("https://evil.com")).toBe(false);
+    expect(isValidApiHostname("evil.com")).toBe(false);
+    expect(isValidApiHostname("api.gcore.org")).toBe(false);
+    expect(isValidApiHostname("notapi.gcore.com")).toBe(false);
   });
 });

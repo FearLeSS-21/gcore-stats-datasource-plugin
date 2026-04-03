@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/G-Core/gcore-stats-datasource-plugin/pkg/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -27,8 +28,13 @@ func newDatasourceFactory() grafanads.InstanceFactoryFunc {
 		}
 
 		url, _ := jsonData["apiUrl"].(string)
+		url = strings.TrimSpace(url)
 		if url == "" {
 			url = "https://api.gcore.com"
+		} else {
+			if err := datasource.ValidateAPIBaseURL(url); err != nil {
+				return nil, err
+			}
 		}
 
 		apiKey := ""

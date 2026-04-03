@@ -46,6 +46,38 @@ export const stripTrailingSlash = (url: string): string => {
 export const removeHttpPrefix = (url: string): string =>
   url.replace(/^https?:\/\//, "");
 
+/** Hostname segment only: trims, strips http(s):// and one trailing slash. */
+export const normalizeApiUrlInput = (raw: string): string => {
+  return stripTrailingSlash(removeHttpPrefix(raw.trim()));
+};
+
+const hostnameWithoutPort = (host: string): string => {
+  if (!host.includes(":")) {
+    return host;
+  }
+  const lastColon = host.lastIndexOf(":");
+  const tail = host.slice(lastColon + 1);
+  if (/^\d+$/.test(tail)) {
+    return host.slice(0, lastColon);
+  }
+  return host;
+};
+
+/**
+ * Empty string is valid (backend uses default api host).
+ * Otherwise: no "/", hostname (ignoring port) must start with api. and end with .com (case-insensitive).
+ */
+export const isValidApiHostname = (normalized: string): boolean => {
+  if (normalized === "") {
+    return true;
+  }
+  if (normalized.includes("/")) {
+    return false;
+  }
+  const host = hostnameWithoutPort(normalized).toLowerCase();
+  return host.startsWith("api.") && host.endsWith(".com");
+};
+
 export const getHostnameValue = (url: string): string => {
-  return stripTrailingSlash(removeHttpPrefix(url));
+  return normalizeApiUrlInput(url);
 };
